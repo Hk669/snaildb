@@ -2,8 +2,10 @@ use std::fs::OpenOptions;
 use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use crate::utils::{RecordKind, read_record, write_record};
-use crate::value::Value;
+use crate::utils::{
+    record::{RecordKind, read_record, write_record},
+    value::Value,
+};
 
 #[derive(Debug)]
 pub struct Wal {
