@@ -1,7 +1,8 @@
 [package]
-name = "database"
+name = "snailDB"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
+axum = "0.8.7"
