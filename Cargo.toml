@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0"
 axum = "0.8.7"
+crc32fast = "1.4"
