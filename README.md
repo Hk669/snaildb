@@ -1,6 +1,6 @@
-# snailDB
+# snailDB 🐌
 
-a NoSQL key value database.
+an embedded, persistent key value store.
 
 principles
 
