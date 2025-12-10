@@ -31,9 +31,9 @@ pub struct DecodedRecord {
     pub kind: RecordKind, // 1 for set, 2 for delete
     pub key: String,
     pub value: Vec<u8>,
-    pub crc32: u32, // checksum of each record
-    pub length: u32, // length of the record payload
-    pub key_length: u32, // length of the key portion
+    pub crc32: u32,        // checksum of each record
+    pub length: u32,       // length of the record payload
+    pub key_length: u32,   // length of the key portion
     pub value_length: u32, // length of the value portion
     pub timestamp: u64,
 }
@@ -58,11 +58,7 @@ pub fn write_record<W: Write>(
     let key_len_encoded = encode_var_u32(key_len);
     let value_len_encoded = encode_var_u32(value_len);
 
-    let payload_len = 1
-        + key_len_encoded.len()
-        + key.len()
-        + value_len_encoded.len()
-        + value.len();
+    let payload_len = 1 + key_len_encoded.len() + key.len() + value_len_encoded.len() + value.len();
 
     let mut payload = Vec::with_capacity(payload_len);
     payload.push(kind.as_byte());
@@ -112,7 +108,10 @@ pub fn read_record<R: Read>(reader: &mut R) -> io::Result<Option<DecodedRecord>>
     let mut cursor = 0usize;
 
     let kind_byte = *payload.get(cursor).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "record payload missing kind byte")
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "record payload missing kind byte",
+        )
     })?;
     cursor += 1;
     let kind = RecordKind::from_byte(kind_byte)?;
@@ -133,9 +132,8 @@ pub fn read_record<R: Read>(reader: &mut R) -> io::Result<Option<DecodedRecord>>
     let key_bytes = &payload[cursor..key_end];
     cursor = key_end;
 
-    let key = String::from_utf8(key_bytes.to_vec()).map_err(|_| {
-        io::Error::new(io::ErrorKind::InvalidData, "key bytes are not valid UTF-8")
-    })?;
+    let key = String::from_utf8(key_bytes.to_vec())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "key bytes are not valid UTF-8"))?;
 
     let value_len = decode_var_u32(&payload, &mut cursor)?;
     let value_len_usize: usize = value_len
@@ -190,7 +188,7 @@ fn read_u32_or_eof<R: Read>(reader: &mut R) -> io::Result<Option<u32>> {
                 return Err(io::Error::new(
                     io::ErrorKind::UnexpectedEof,
                     "truncated record length header",
-                ))
+                ));
             }
             n => read += n,
         }
@@ -219,7 +217,10 @@ fn decode_var_u32(buffer: &[u8], cursor: &mut usize) -> io::Result<u32> {
     let mut shift = 0;
     for _ in 0..5 {
         let byte = *buffer.get(*cursor).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::UnexpectedEof, "truncated varint while reading record")
+            io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "truncated varint while reading record",
+            )
         })?;
         *cursor += 1;
         value |= ((byte & 0x7F) as u32) << shift;
