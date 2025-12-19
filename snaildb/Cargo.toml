@@ -1,0 +1,10 @@
+[package]
+name = "snaildb"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+crc32fast = "1.4"
+crossbeam-skiplist = "0.1"
+tracing = "0.1"

@@ -5,12 +5,14 @@ use crate::utils::value::Value;
 #[derive(Debug)]
 pub struct MemTable {
     entries: SkipMap<String, Value>,
+    mutable : bool,
 }
 
 impl MemTable {
     pub fn new() -> Self {
         Self {
             entries: SkipMap::new(),
+            mutable: true,
         }
     }
 
