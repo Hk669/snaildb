@@ -34,10 +34,10 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build workspace
-        run: cargo build --workspace --verbose
+        run: cargo build --workspace
 
       - name: Run tests
-        run: cargo test --workspace --verbose
+        run: cargo test --workspace
 
       - name: Check code
-        run: cargo check --workspace --verbose
+        run: cargo check --workspace
