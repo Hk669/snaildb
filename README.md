@@ -1,5 +1,5 @@
 <a href="https://github.com/Hk669/snaildb">
-  <img src="https://github.com/Hk669/snaildb/blob/main/.github/banner.png?raw=true" alt="snaildb" width="1200" height="200">
+  <img src="https://github.com/Hk669/snaildb/blob/master/.github/banner.png?raw=true" alt="snaildb" width="1200" height="200">
 </a>
 
 <a href="https://crates.io/crates/snaildb">![Crates.io Version](https://img.shields.io/crates/v/snaildb?style=flat-square)</a>
