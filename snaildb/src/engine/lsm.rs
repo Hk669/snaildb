@@ -10,14 +10,15 @@ use crate::wal::wal::Wal;
 use crate::utils::value::Value;
 use tracing::info;
 
-const DEFAULT_FLUSH_THRESHOLD: usize = 128;
+// Default flush threshold: 250 MiB
+const DEFAULT_FLUSH_THRESHOLD_BYTES: usize = 250 * 1024 * 1024; // 250 MiB
 
 #[derive(Debug)]
 pub struct LsmTree {
     pub memtable: MemTable,
     pub wal: Wal,
     pub sstables: Vec<SsTable>,
-    pub flush_threshold: usize,
+    pub flush_threshold_bytes: usize,
     pub data_dir: PathBuf,
 }
 
@@ -42,13 +43,13 @@ impl LsmTree {
                 sstables.sort_by(|a, b| b.path().cmp(a.path()));
                 sstables
             },
-            flush_threshold: DEFAULT_FLUSH_THRESHOLD,
+            flush_threshold_bytes: DEFAULT_FLUSH_THRESHOLD_BYTES,
             data_dir: base_path,
         })
     }
 
-    pub fn with_flush_threshold(mut self, entries: usize) -> Self {
-        self.flush_threshold = entries.max(1); // max is to prevent the flush threshold from being set to 0
+    pub fn with_flush_threshold(mut self, bytes: usize) -> Self {
+        self.flush_threshold_bytes = bytes.max(1); // max is to prevent the flush threshold from being set to 0
         self
     }
 
@@ -59,7 +60,7 @@ impl LsmTree {
             .append_set(&key, &value_bytes)
             .with_context(|| "failed to write to WAL")?;
         self.memtable.insert(key, Value::from_bytes(value_bytes));
-        if self.memtable.len() >= self.flush_threshold {
+        if self.memtable.size_bytes() >= self.flush_threshold_bytes {
             self.flush_memtable()?;
         }
         Ok(())
@@ -71,7 +72,7 @@ impl LsmTree {
             .append_delete(&key)
             .with_context(|| "failed to write tombstone to WAL")?;
         self.memtable.insert(key, Value::tombstone());
-        if self.memtable.len() >= self.flush_threshold {
+        if self.memtable.size_bytes() >= self.flush_threshold_bytes {
             self.flush_memtable()?;
         }
         Ok(())
