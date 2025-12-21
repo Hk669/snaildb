@@ -20,10 +20,12 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-snaildb = "0.1.0"
+snaildb = "0.1"
 ```
 
 Or install the binaries from [GitHub Releases](https://github.com/Hk669/snaildb/releases).
+
+[![crates.io](https://img.shields.io/crates/v/snaildb.svg)](https://crates.io/crates/snaildb)
 
 ## Usage
 
