@@ -53,8 +53,6 @@ jobs:
           body: ${{ steps.notes.outputs.NOTES }}
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
 
   publish:
     name: Publish to crates.io
