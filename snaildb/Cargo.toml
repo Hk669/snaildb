@@ -2,6 +2,14 @@
 name = "snaildb"
 version.workspace = true
 edition.workspace = true
+description = "An embedded, persistent key-value store with high write throughput and durability"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 anyhow = "1.0"
