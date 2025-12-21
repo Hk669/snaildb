@@ -133,11 +133,7 @@ Current work in progress:
 
 ## License
 
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
-
-at your option.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
