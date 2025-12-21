@@ -31,8 +31,6 @@ jobs:
           
           {
             echo "NOTES<<EOF"
-            echo "# Release ${TAG_NAME}"
-            echo ""
             echo "## Changes"
             echo "${CHANGELOG}"
             echo ""
