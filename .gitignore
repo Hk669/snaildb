@@ -1,9 +1,43 @@
+# Rust
 /target
+**/*.rs.bk
+
+# Database data directories
 data/
 bench-data/
 bench-*/
+
+# Binaries
 bin/
 scripts/
+
+# IDE and editor files
 .cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
 .env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+image.png
+
+# Test artifacts
+*.test
+coverage/
+*.profdata
 

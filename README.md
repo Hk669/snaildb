@@ -1,4 +1,11 @@
-# snailDB 🐌
+<a href="https://github.com/Hk669/snaildb">
+  <img src="https://github.com/Hk669/snaildb/blob/main/.github/banner.png?raw=true" alt="snaildb" width="1200" height="200">
+</a>
+
+<a href="https://crates.io/crates/snaildb">![Crates.io Version](https://img.shields.io/crates/v/snaildb?style=flat-square)</a>
+![GitHub License](https://img.shields.io/github/license/Hk669/snaildb?style=flat-square)
+<a href="https://github.com/Hk669/snaildb">![GitHub](https://img.shields.io/github/stars/Hk669/snaildb?style=flat-square)</a>
+<a href="https://docs.rs/snaildb/latest/snaildb/">![Docs](https://img.shields.io/badge/docs-docs.rs-blue?style=flat-square)</a>
 
 An embedded, persistent key-value store written in Rust.
 
@@ -24,8 +31,6 @@ snaildb = "0.1"
 ```
 
 Or install the binaries from [GitHub Releases](https://github.com/Hk669/snaildb/releases).
-
-[![crates.io](https://img.shields.io/crates/v/snaildb.svg)](https://crates.io/crates/snaildb)
 
 ## Usage
 
