@@ -5,3 +5,5 @@ bench-*/
 bin/
 scripts/
 .cursor/
+.env
+

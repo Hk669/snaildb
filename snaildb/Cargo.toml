@@ -16,3 +16,6 @@ anyhow = "1.0"
 crc32fast = "1.4"
 crossbeam-skiplist = "0.1"
 tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3.10"
