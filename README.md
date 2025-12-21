@@ -1,6 +1,5 @@
-<a href="https://github.com/Hk669/snaildb">
-  <img src="https://github.com/Hk669/snaildb/blob/master/.github/banner.png?raw=true" alt="snaildb" width="1200" height="200">
-</a>
+<img width="2266" height="642" alt="image" src="https://github.com/user-attachments/assets/53e68713-afb5-42cc-af44-a0ca89d27121" />
+
 
 <a href="https://crates.io/crates/snaildb">![Crates.io Version](https://img.shields.io/crates/v/snaildb?style=flat-square)</a>
 ![GitHub License](https://img.shields.io/github/license/Hk669/snaildb?style=flat-square)
