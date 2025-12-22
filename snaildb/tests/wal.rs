@@ -1,4 +1,4 @@
-use snaildb::wal::wal::Wal;
+use snaildb::wal::Wal;
 use anyhow::Result;
 use tempfile::TempDir;
 use std::path::PathBuf;
