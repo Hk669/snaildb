@@ -8,27 +8,18 @@ use crate::wal::enums::WriteCommand;
 use crate::wal::db_sync::SyncManager;
 use crate::worker::handler::WorkerManager;
 
-use crate::utils::{
-    record::{RecordKind, read_record, write_record},
-    value::Value,
-};
+use crate::utils::{RecordKind, read_record, write_record, Value};
 
 /// WAL (Write-Ahead Log) provides durable write operations.
 /// 
 /// Writes are sent to a background thread that handles file I/O,
 /// ensuring that write operations don't block the main thread.
+#[derive(Debug)]
 pub struct Wal {
-    path: PathBuf,
-    worker: WorkerManager<WriteCommand>,
-}
-
-impl std::fmt::Debug for Wal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Wal")
-            .field("path", &self.path)
-            .field("worker", &"<WorkerManager>")
-            .finish()
-    }
+    /// The path to the WAL file.
+    pub path: PathBuf,
+    /// The worker manager that handles the background thread for the WAL.
+    pub worker: WorkerManager<WriteCommand>,
 }
 
 impl Wal {
@@ -122,6 +113,7 @@ impl Wal {
         Ok(())
     }
 
+    /// Writes a record to the WAL file, internal function.
     fn write_record_internal(
         &mut self,
         kind: RecordKind,

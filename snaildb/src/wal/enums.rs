@@ -1,5 +1,6 @@
 use crate::utils::record::RecordKind;
 
+#[derive(Debug)]
 pub enum WriteCommand {
     WriteRecord {
         kind: RecordKind,
