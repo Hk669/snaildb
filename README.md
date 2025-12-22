@@ -38,12 +38,12 @@ Or install the binaries from [GitHub Releases](https://github.com/Hk669/snaildb/
 #### Basic Operations
 
 ```rust
-use snaildb::engine::lsm::LsmTree;
+use snaildb::SnailDb;
 use anyhow::Result;
 
 fn main() -> Result<()> {
     // Open or create a database at a directory
-    let mut db = LsmTree::open("./data")?;
+    let mut db = SnailDb::open("./data")?;
     
     // Store a key-value pair
     db.put("user:1", b"Alice")?;
@@ -65,16 +65,16 @@ fn main() -> Result<()> {
 #### Custom Flush Threshold
 
 ```rust
-use snaildb::engine::lsm::LsmTree;
+use snaildb::SnailDb;
 
-let mut db = LsmTree::open("./data")?
+let mut db = SnailDb::open("./data")?
     .with_flush_threshold(256 * 1024 * 1024); // Flush memtable after 256 MiB
 ```
 
 #### Working with Strings
 
 ```rust
-let mut db = LsmTree::open("./data")?;
+let mut db = SnailDb::open("./data")?;
 
 // Store string values
 db.put("name", "snaildb")?;
@@ -89,11 +89,11 @@ if let Some(bytes) = db.get("name")? {
 #### Error Handling
 
 ```rust
-use snaildb::engine::lsm::LsmTree;
+use snaildb::SnailDb;
 use anyhow::{Result, Context};
 
 fn store_data() -> Result<()> {
-    let mut db = LsmTree::open("./data")
+    let mut db = SnailDb::open("./data")
         .context("Failed to open database")?;
     
     db.put("key", "value")
@@ -114,7 +114,7 @@ See the [examples directory](./examples) for more detailed usage examples.
 The flush threshold determines when the in-memory memtable is flushed to disk as an SSTable. Default is 250 MiB.
 
 ```rust
-let mut db = LsmTree::open("./data")?
+let mut db = SnailDb::open("./data")?
     .with_flush_threshold(256 * 1024 * 1024); // Custom threshold
 ```
 
@@ -131,7 +131,6 @@ snailDB uses an LSM-tree (Log-Structured Merge-tree) architecture:
 Current work in progress:
 
 - **Durable async WAL** - Group commit and crash recovery improvements
-- **Object storage support** - S3/MinIO integration for cloud-native deployments
 - **Compaction** - Background compaction to manage SSTable growth
 - **Iterators & scans** - Efficient range queries and prefix scans
 - **Performance optimizations** - Block caching and metrics

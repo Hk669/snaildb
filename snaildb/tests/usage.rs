@@ -1,4 +1,4 @@
-use snaildb::engine::lsm::LsmTree;
+use snaildb::SnailDb;
 use anyhow::Result;
 use tempfile::TempDir;
 
@@ -8,7 +8,7 @@ fn test_basic_operations() -> Result<()> {
     let db_path = temp_dir.path().join("test_db");
     
     // Open or create a database at a directory
-    let mut db = LsmTree::open(&db_path)?;
+    let mut db = SnailDb::open(&db_path)?;
     
     // Store a key-value pair
     db.put("user:1", b"Alice")?;
@@ -37,7 +37,7 @@ fn test_custom_flush_threshold() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let db_path = temp_dir.path().join("test_db");
     
-    let mut db = LsmTree::open(&db_path)?
+    let mut db = SnailDb::open(&db_path)?
         .with_flush_threshold(256 * 1024 * 1024); // Flush memtable after 256 MiB (for testing)
     
     // Verify it works
@@ -52,7 +52,7 @@ fn test_working_with_strings() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let db_path = temp_dir.path().join("test_db");
     
-    let mut db = LsmTree::open(&db_path)?;
+    let mut db = SnailDb::open(&db_path)?;
     
     // Store string values
     db.put("name", "snaildb")?;
@@ -83,7 +83,7 @@ fn test_error_handling() -> Result<()> {
     
     use anyhow::Context;
     
-    let mut db = LsmTree::open(&db_path)
+    let mut db = SnailDb::open(&db_path)
         .context("Failed to open database")?;
     
     db.put("key", "value")
@@ -100,7 +100,7 @@ fn test_multiple_operations() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let db_path = temp_dir.path().join("test_db");
     
-    let mut db = LsmTree::open(&db_path)?;
+    let mut db = SnailDb::open(&db_path)?;
     
     // Put multiple values
     for i in 0..10 {
