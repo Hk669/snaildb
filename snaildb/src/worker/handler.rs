@@ -3,16 +3,21 @@ use std::thread;
 use std::time::Duration;
 
 // worker manager, manages the mpsc channel across wal, compaction, etc..
+#[derive(Debug)]
 pub struct WorkerManager<C> {
-    sender: mpsc::Sender<C>,
+    /// The sender to send commands to the worker.
+    pub sender: mpsc::Sender<C>,
+    /// The thread handle to join the thread.
     _thread_handle: thread::JoinHandle<()>, // thread handle to join the thread
 }
 
 impl<C> WorkerManager<C> {
+    /// Sends a command to the worker.
     pub fn send(&self, cmd: C) -> Result<(), mpsc::SendError<C>> {
         self.sender.send(cmd)
     }
 
+    /// Spawns a new worker thread with the given handler and timeout.
     pub fn spawn<F>(handler: F, timeout: Duration) -> Self
     where
         F: FnOnce(mpsc::Receiver<C>, Duration) + Send + 'static, // custom function to handle the messages 
