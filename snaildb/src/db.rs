@@ -4,14 +4,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 
-use crate::storage::memtable::MemTable;
-use crate::storage::sstable::SsTable;
+use crate::storage::MemTable;
+use crate::storage::SsTable;
 use crate::wal::Wal;
 use crate::utils::Value;
 use tracing::info;
 
-/// The default flush threshold is 512 MiB.
-const DEFAULT_FLUSH_THRESHOLD_BYTES: usize = 512 * 1024 * 1024; // 512 MiB
+/// The default flush threshold is 64 MiB (same as RocksDB).
+/// This is a safe default for most containerized environments with 512MB-2GB RAM.
+const DEFAULT_FLUSH_THRESHOLD_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
 
 /// SnailDb is a struct that represents the database, with the LSM-tree based storage engine, which includes a memtable, a WAL file, and a vector of SSTables.
 #[derive(Debug)]
@@ -41,6 +42,7 @@ impl SnailDb {
             memtable.insert(key, value);
         }
 
+        // this is very inefficient for large databases right now, as it loads all the sstables into memory. tbd - load metadata instead of the entire sstable.
         let mut sstables = load_existing_sstables(&base_path)?;
 
         Ok(Self {
@@ -94,12 +96,14 @@ impl SnailDb {
             return Ok(value.as_option());
         }
 
+        // this is a little efficient than previous implementation, where we can skip the sstable lookups if key not in between the min and max key of the sstable
         for table in &self.sstables {
-            if let Some(value) = table.get(key) {
-                return Ok(value.as_option());
+            if table.might_contain_key(key) {
+                if let Some(value) = table.get(key) {
+                    return Ok(value.as_option());
+                }
             }
         }
-
         Ok(None)
     }
 
