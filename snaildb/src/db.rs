@@ -4,8 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 
-use crate::storage::MemTable;
-use crate::storage::SsTable;
+use crate::storage::{MemTable, SsTable};
 use crate::wal::Wal;
 use crate::utils::Value;
 use tracing::info;
@@ -42,7 +41,7 @@ impl SnailDb {
             memtable.insert(key, value);
         }
 
-        // this is very inefficient for large databases right now, as it loads all the sstables into memory. tbd - load metadata instead of the entire sstable.
+        // Load only metadata (bloom filter, min/max keys) for efficient startup
         let mut sstables = load_existing_sstables(&base_path)?;
 
         Ok(Self {
@@ -96,10 +95,12 @@ impl SnailDb {
             return Ok(value.as_option());
         }
 
-        // this is a little efficient than previous implementation, where we can skip the sstable lookups if key not in between the min and max key of the sstable
+        // Check each SSTable: bloom filter -> key range -> load entries and search
+        // Entries are loaded lazily only when might_contain_key returns true
         for table in &self.sstables {
             if table.might_contain_key(key) {
-                if let Some(value) = table.get(key) {
+                if let Some(value) = table.get(key)
+                    .with_context(|| format!("failed to read from sstable {}", table.path().display()))? {
                     return Ok(value.as_option());
                 }
             }
@@ -135,6 +136,8 @@ impl SnailDb {
 }
 
 /// Loads the existing SSTables from the given directory.
+/// Only loads metadata (bloom filter, min/max keys) for efficient startup.
+/// Entries are loaded lazily when needed.
 fn load_existing_sstables(dir: &Path) -> Result<Vec<SsTable>> {
     let mut tables = Vec::new();
     for entry in fs::read_dir(dir)? {
@@ -143,8 +146,8 @@ fn load_existing_sstables(dir: &Path) -> Result<Vec<SsTable>> {
         if let Some(ext) = path.extension() {
             if ext == "sst" {
                 tables.push(
-                    SsTable::load(&path)
-                        .with_context(|| format!("failed to load sstable {}", path.display()))?,
+                    SsTable::load_metadata(&path)
+                        .with_context(|| format!("failed to load sstable metadata {}", path.display()))?,
                 );
             }
         }
