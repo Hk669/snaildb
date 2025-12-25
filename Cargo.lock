@@ -523,7 +523,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "snailctl"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "axum",
  "serde",
@@ -536,7 +536,7 @@ dependencies = [
 
 [[package]]
 name = "snaildb"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "crc32fast",
