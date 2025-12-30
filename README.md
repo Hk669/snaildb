@@ -5,6 +5,7 @@
 ![GitHub License](https://img.shields.io/github/license/Hk669/snaildb?style=flat-square)
 <a href="https://github.com/Hk669/snaildb">![GitHub](https://img.shields.io/github/stars/Hk669/snaildb?style=flat-square)</a>
 <a href="https://docs.rs/snaildb/latest/snaildb/">![Docs](https://img.shields.io/badge/docs-docs.rs-blue?style=flat-square)</a>
+<a href="https://x.com/snaildb_org">![X (Twitter)](https://img.shields.io/badge/follow-@snaildb_org-1da1f2?logo=x&logoColor=white&style=flat-square)</a>
 
 An embedded, persistent key-value store written in Rust.
 
@@ -19,7 +20,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-snaildb = "0.1"
+snaildb = "0.2"
 ```
 
 Or install the binaries from [GitHub Releases](https://github.com/Hk669/snaildb/releases).
@@ -98,13 +99,17 @@ fn store_data() -> Result<()> {
 
 ## Examples
 
-See the [examples directory](./examples) for more detailed usage examples.
+See the [examples directory](./snaildb/examples) for more detailed usage examples. Run them with:
+
+```bash
+cargo run --example <example_name> --package snaildb
+```
 
 ## Configuration
 
 ### Flush Threshold
 
-The flush threshold determines when the in-memory memtable is flushed to disk as an SSTable. Default is 250 MiB.
+The flush threshold determines when the in-memory memtable is flushed to disk as an SSTable. Default is 64 MiB.
 
 ```rust
 let mut db = SnailDb::open("./data")?
