@@ -37,6 +37,7 @@ impl Wal {
             .create(true)
             .read(true)
             .write(true)
+            .append(true) // append mode automatically moves the cursor to end of file, eliminating seek overhead costing write performance everytime we write a record to the file.
             .open(&path)?;
         
         let wal_path = path.clone();
@@ -151,11 +152,7 @@ fn wal_handler(
     loop {
         match receiver.recv_timeout(timeout) {
             Ok(WriteCommand::WriteRecord { kind, key, value }) => {
-                // Seek to end of file and write the record
-                if let Err(e) = file.seek(SeekFrom::End(0)) {
-                    eprintln!("WAL seek error: {}", e);
-                    continue;
-                }
+                // the seek over head is not required, as the append mode points the cursor directly to the end.
                 if let Err(e) = write_record(&mut file, kind, &key, &value) {
                     eprintln!("WAL write error: {}", e);
                     continue;
