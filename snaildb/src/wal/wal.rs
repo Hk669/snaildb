@@ -1,14 +1,14 @@
 use std::fs::{File, OpenOptions};
-use std::io::{self, Seek, SeekFrom};
+use std::io::{self, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::wal::enums::WriteCommand;
-use crate::wal::db_sync::SyncManager;
+use crate::wal::{FLUSH_INTERVAL_MS, SyncManager};
 use crate::worker::handler::WorkerManager;
 
-use crate::utils::{RecordKind, read_record, write_record, Value};
+use crate::utils::{RecordKind, read_record, encode_batch_records, Value};
 
 /// WAL (Write-Ahead Log) provides durable write operations.
 /// 
@@ -135,6 +135,62 @@ impl Wal {
     }
 }
 
+/// Writes the batch buffer to file if it's not empty, marks dirty, and clears it.
+fn write_batch_if_needed(
+    file: &mut File,
+    sync_manager: &mut SyncManager,
+    batch_buffer: &mut Vec<u8>,
+) {
+    if !batch_buffer.is_empty() {
+        if let Err(e) = file.write_all(batch_buffer) {
+            eprintln!("WAL write error: {}", e);
+        } else {
+            sync_manager.mark_dirty();
+        }
+        batch_buffer.clear();
+    }
+}
+
+/// Handles a flush command: writes any pending batch and flushes to disk.
+fn handle_flush(
+    file: &mut File,
+    sync_manager: &mut SyncManager,
+    batch_buffer: &mut Vec<u8>,
+) {
+    write_batch_if_needed(file, sync_manager, batch_buffer);
+    if let Err(e) = sync_manager.flush_if_pending_file(file) {
+        eprintln!("WAL flush error: {}", e);
+    }
+}
+
+/// Handles a reset command: writes batch, flushes, truncates file, and clears state.
+fn handle_reset(
+    file: &mut File,
+    sync_manager: &mut SyncManager,
+    batch_buffer: &mut Vec<u8>,
+) {
+    write_batch_if_needed(file, sync_manager, batch_buffer);
+    
+    // Flush before reset to ensure all data is persisted
+    if let Err(e) = sync_manager.flush_if_pending_file(file) {
+        eprintln!("WAL flush error: {}", e);
+    }
+    
+    // Reset the file (truncate to zero)
+    if let Err(e) = file.set_len(0) {
+        eprintln!("WAL reset error: {}", e);
+    }
+    if let Err(e) = file.sync_all() {
+        eprintln!("WAL sync error: {}", e);
+    }
+    if let Err(e) = file.seek(SeekFrom::Start(0)) {
+        eprintln!("WAL seek error: {}", e);
+    }
+    
+    // Clear pending state after reset since file is empty
+    sync_manager.clear_pending();
+}
+
 /// The worker thread handler that processes WAL commands.
 /// 
 /// This function runs in a dedicated background thread and handles:
@@ -148,47 +204,88 @@ fn wal_handler(
     mut file: File,
 ) {
     let mut sync_manager = SyncManager::new();
+    let mut batch_buffer = Vec::with_capacity(8192);
 
     loop {
         match receiver.recv_timeout(timeout) {
             Ok(WriteCommand::WriteRecord { kind, key, value }) => {
-                // the seek over head is not required, as the append mode points the cursor directly to the end.
-                if let Err(e) = write_record(&mut file, kind, &key, &value) {
-                    eprintln!("WAL write error: {}", e);
+                // Batch writes to avoid syscall overhead.
+                // Clear buffer but keep capacity to avoid reallocations
+                batch_buffer.clear();
+
+                // Encode first record into buffer
+                if let Err(e) = encode_batch_records(&mut batch_buffer, kind, &key, &value) {
+                    eprintln!("WAL encode error: {}", e);
                     continue;
                 }
-                sync_manager.mark_dirty();
+                
+                let mut should_write_batch = true;
+                let batch_start_time = Instant::now();
+                
+                // Try to drain more WriteRecord commands (non-blocking)
+                loop {
+                    // Check if flush interval has elapsed since batch start
+                    if batch_start_time.elapsed() >= Duration::from_millis(FLUSH_INTERVAL_MS) {
+                        break;
+                    }
+                    
+                    match receiver.try_recv() {
+                        Ok(WriteCommand::WriteRecord { kind, key, value }) => {
+                            // Encode this record into the batch buffer
+                            if let Err(e) = encode_batch_records(&mut batch_buffer, kind, &key, &value) {
+                                eprintln!("WAL encode error: {}", e);
+                                break; // Write what we have so far
+                            }
+                        }
+                        Ok(WriteCommand::Flush) => {
+                            handle_flush(&mut file, &mut sync_manager, &mut batch_buffer);
+                            should_write_batch = false; // Already wrote and flushed
+                            break;
+                        }
+                        Ok(WriteCommand::Reset) => {
+                            handle_reset(&mut file, &mut sync_manager, &mut batch_buffer);
+                            should_write_batch = false; // Already handled reset
+                            break;
+                        }
+                        Ok(WriteCommand::Shutdown) => {
+                            write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                            // Force flush on shutdown
+                            if let Err(e) = sync_manager.force_flush(&mut file) {
+                                eprintln!("WAL flush error: {}", e);
+                            }
+                            return; // Exit the handler loop
+                        }
+                        Err(mpsc::TryRecvError::Empty) => {
+                            // No more commands available, exit batching loop
+                            break;
+                        }
+                        Err(mpsc::TryRecvError::Disconnected) => {
+                            // Channel closed, write batch and exit
+                            write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                            if let Err(e) = sync_manager.force_flush(&mut file) {
+                                eprintln!("WAL flush error: {}", e);
+                            }
+                            return; // Exit the handler loop
+                        }
+                    }
+                }
+                
+                // Write the entire batch in ONE syscall (if not already written)
+                if should_write_batch {
+                    write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                }
             }
             
             Ok(WriteCommand::Flush) => {
-                // Flush if there are pending writes
-                if let Err(e) = sync_manager.flush_if_pending_file(&mut file) {
-                    eprintln!("WAL flush error: {}", e);
-                }
+                handle_flush(&mut file, &mut sync_manager, &mut batch_buffer);
             }
             
             Ok(WriteCommand::Reset) => {
-                // Flush before reset to ensure all data is persisted
-                if let Err(e) = sync_manager.flush_if_pending_file(&mut file) {
-                    eprintln!("WAL flush error: {}", e);
-                }
-                
-                // Reset the file (truncate to zero)
-                if let Err(e) = file.set_len(0) {
-                    eprintln!("WAL reset error: {}", e);
-                }
-                if let Err(e) = file.sync_all() {
-                    eprintln!("WAL sync error: {}", e);
-                }
-                if let Err(e) = file.seek(SeekFrom::Start(0)) {
-                    eprintln!("WAL seek error: {}", e);
-                }
-                
-                // Clear pending state after reset since file is empty
-                sync_manager.clear_pending();
+                handle_reset(&mut file, &mut sync_manager, &mut batch_buffer);
             }
             
             Ok(WriteCommand::Shutdown) => {
+                write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
                 // Force flush on shutdown to ensure all data is persisted
                 if let Err(e) = sync_manager.force_flush(&mut file) {
                     eprintln!("WAL flush error: {}", e);

@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::time::Duration;
 
 /// Configuration constant for flush interval
-pub const FLUSH_INTERVAL_MS: u64 = 50; // 50 ms
+pub const FLUSH_INTERVAL_MS: u64 = 10; // 10 ms
 
 /// Manages the sync/flush state and operations for WAL durability.
 /// 
