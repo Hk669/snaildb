@@ -210,6 +210,48 @@ fn test_failure_concurrent_reset_and_write() -> Result<()> {
 // ============================================================================
 
 #[test]
+fn test_force_flush_waits_for_durability_ack() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let db_path = temp_dir.path().join("test_db");
+    let mut db = Wal::open(&db_path)?;
+
+    for i in 0..1000 {
+        db.append_set(&format!("key_{}", i), &format!("value_{}", i).as_bytes())?;
+    }
+
+    // No sleep: force_flush must not return until the worker has written and synced
+    // every command queued before the flush acknowledgement.
+    db.force_flush()?;
+
+    let entries = db.replay()?;
+    assert_eq!(entries.len(), 1000);
+
+    Ok(())
+}
+
+#[test]
+fn test_reset_waits_for_truncate_ack() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let db_path = temp_dir.path().join("test_db");
+    let mut db = Wal::open(&db_path)?;
+
+    for i in 0..1000 {
+        db.append_set(&format!("key_{}", i), &format!("value_{}", i).as_bytes())?;
+    }
+    db.force_flush()?;
+    assert_eq!(db.replay()?.len(), 1000);
+
+    // No sleep: reset must not return until the worker has flushed pending writes,
+    // truncated the WAL, synced the truncation, and acknowledged completion.
+    db.reset()?;
+
+    let entries = db.replay()?;
+    assert_eq!(entries.len(), 0);
+
+    Ok(())
+}
+
+#[test]
 fn test_mpsc_handler_write_record_commands() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let db_path = temp_dir.path().join("test_db");

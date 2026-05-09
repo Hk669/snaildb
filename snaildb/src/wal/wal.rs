@@ -92,26 +92,34 @@ impl Wal {
     /// 
     /// This is useful for critical operations that require durability guarantees.
     pub fn force_flush(&self) -> io::Result<()> {
+        let (ack, ack_rx) = mpsc::channel();
         self.worker
-            .send(WriteCommand::Flush)
+            .send(WriteCommand::Flush { ack })
             .map_err(|e| io::Error::new(
                 io::ErrorKind::Other,
                 format!("WAL force_flush error: {}", e)
             ))?;
-        Ok(())
+        ack_rx.recv().map_err(|e| io::Error::new(
+            io::ErrorKind::Other,
+            format!("WAL force_flush ack error: {}", e)
+        ))?
     }
 
     /// Resets the WAL file (truncates to zero length).
     /// 
     /// This is typically called after flushing the memtable to SSTable.
     pub fn reset(&mut self) -> io::Result<()> {
+        let (ack, ack_rx) = mpsc::channel();
         self.worker
-            .send(WriteCommand::Reset)
+            .send(WriteCommand::Reset { ack })
             .map_err(|e| io::Error::new(
                 io::ErrorKind::Other,
                 format!("WAL reset error: {}", e)
             ))?;
-        Ok(())
+        ack_rx.recv().map_err(|e| io::Error::new(
+            io::ErrorKind::Other,
+            format!("WAL reset ack error: {}", e)
+        ))?
     }
 
     /// Writes a record to the WAL file, internal function.
@@ -140,15 +148,13 @@ fn write_batch_if_needed(
     file: &mut File,
     sync_manager: &mut SyncManager,
     batch_buffer: &mut Vec<u8>,
-) {
+) -> io::Result<()> {
     if !batch_buffer.is_empty() {
-        if let Err(e) = file.write_all(batch_buffer) {
-            eprintln!("WAL write error: {}", e);
-        } else {
-            sync_manager.mark_dirty();
-        }
+        file.write_all(batch_buffer)?;
+        sync_manager.mark_dirty();
         batch_buffer.clear();
     }
+    Ok(())
 }
 
 /// Handles a flush command: writes any pending batch and flushes to disk.
@@ -156,11 +162,9 @@ fn handle_flush(
     file: &mut File,
     sync_manager: &mut SyncManager,
     batch_buffer: &mut Vec<u8>,
-) {
-    write_batch_if_needed(file, sync_manager, batch_buffer);
-    if let Err(e) = sync_manager.flush_if_pending_file(file) {
-        eprintln!("WAL flush error: {}", e);
-    }
+) -> io::Result<()> {
+    write_batch_if_needed(file, sync_manager, batch_buffer)?;
+    sync_manager.flush_if_pending_file(file)
 }
 
 /// Handles a reset command: writes batch, flushes, truncates file, and clears state.
@@ -168,27 +172,20 @@ fn handle_reset(
     file: &mut File,
     sync_manager: &mut SyncManager,
     batch_buffer: &mut Vec<u8>,
-) {
-    write_batch_if_needed(file, sync_manager, batch_buffer);
+) -> io::Result<()> {
+    write_batch_if_needed(file, sync_manager, batch_buffer)?;
     
     // Flush before reset to ensure all data is persisted
-    if let Err(e) = sync_manager.flush_if_pending_file(file) {
-        eprintln!("WAL flush error: {}", e);
-    }
+    sync_manager.flush_if_pending_file(file)?;
     
     // Reset the file (truncate to zero)
-    if let Err(e) = file.set_len(0) {
-        eprintln!("WAL reset error: {}", e);
-    }
-    if let Err(e) = file.sync_all() {
-        eprintln!("WAL sync error: {}", e);
-    }
-    if let Err(e) = file.seek(SeekFrom::Start(0)) {
-        eprintln!("WAL seek error: {}", e);
-    }
+    file.set_len(0)?;
+    file.sync_all()?;
+    file.seek(SeekFrom::Start(0))?;
     
     // Clear pending state after reset since file is empty
     sync_manager.clear_pending();
+    Ok(())
 }
 
 /// The worker thread handler that processes WAL commands.
@@ -237,18 +234,22 @@ fn wal_handler(
                                 break; // Write what we have so far
                             }
                         }
-                        Ok(WriteCommand::Flush) => {
-                            handle_flush(&mut file, &mut sync_manager, &mut batch_buffer);
+                        Ok(WriteCommand::Flush { ack }) => {
+                            let result = handle_flush(&mut file, &mut sync_manager, &mut batch_buffer);
+                            let _ = ack.send(result);
                             should_write_batch = false; // Already wrote and flushed
                             break;
                         }
-                        Ok(WriteCommand::Reset) => {
-                            handle_reset(&mut file, &mut sync_manager, &mut batch_buffer);
+                        Ok(WriteCommand::Reset { ack }) => {
+                            let result = handle_reset(&mut file, &mut sync_manager, &mut batch_buffer);
+                            let _ = ack.send(result);
                             should_write_batch = false; // Already handled reset
                             break;
                         }
                         Ok(WriteCommand::Shutdown) => {
-                            write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                            if let Err(e) = write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer) {
+                                eprintln!("WAL write error: {}", e);
+                            }
                             // Force flush on shutdown
                             if let Err(e) = sync_manager.force_flush(&mut file) {
                                 eprintln!("WAL flush error: {}", e);
@@ -261,7 +262,9 @@ fn wal_handler(
                         }
                         Err(mpsc::TryRecvError::Disconnected) => {
                             // Channel closed, write batch and exit
-                            write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                            if let Err(e) = write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer) {
+                                eprintln!("WAL write error: {}", e);
+                            }
                             if let Err(e) = sync_manager.force_flush(&mut file) {
                                 eprintln!("WAL flush error: {}", e);
                             }
@@ -272,20 +275,26 @@ fn wal_handler(
                 
                 // Write the entire batch in ONE syscall (if not already written)
                 if should_write_batch {
-                    write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                    if let Err(e) = write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer) {
+                        eprintln!("WAL write error: {}", e);
+                    }
                 }
             }
             
-            Ok(WriteCommand::Flush) => {
-                handle_flush(&mut file, &mut sync_manager, &mut batch_buffer);
+            Ok(WriteCommand::Flush { ack }) => {
+                let result = handle_flush(&mut file, &mut sync_manager, &mut batch_buffer);
+                let _ = ack.send(result);
             }
             
-            Ok(WriteCommand::Reset) => {
-                handle_reset(&mut file, &mut sync_manager, &mut batch_buffer);
+            Ok(WriteCommand::Reset { ack }) => {
+                let result = handle_reset(&mut file, &mut sync_manager, &mut batch_buffer);
+                let _ = ack.send(result);
             }
             
             Ok(WriteCommand::Shutdown) => {
-                write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer);
+                if let Err(e) = write_batch_if_needed(&mut file, &mut sync_manager, &mut batch_buffer) {
+                    eprintln!("WAL write error: {}", e);
+                }
                 // Force flush on shutdown to ensure all data is persisted
                 if let Err(e) = sync_manager.force_flush(&mut file) {
                     eprintln!("WAL flush error: {}", e);
