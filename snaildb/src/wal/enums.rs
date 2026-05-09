@@ -1,4 +1,5 @@
 use crate::utils::record::RecordKind;
+use std::{io, sync::mpsc};
 
 #[derive(Debug)]
 pub enum WriteCommand {
@@ -7,8 +8,12 @@ pub enum WriteCommand {
         key: String,
         value: Vec<u8>,
     },
-    Flush,
-    Reset,
+    Flush {
+        ack: mpsc::Sender<io::Result<()>>,
+    },
+    Reset {
+        ack: mpsc::Sender<io::Result<()>>,
+    },
     Shutdown,
 }
 
